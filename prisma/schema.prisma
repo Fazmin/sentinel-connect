@@ -1,0 +1,210 @@
+// SentinelConnect - Secure Data Provisioning Service
+// Prisma Schema for Configuration Database
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// Data Source Configuration - Enterprise DB connections
+model DataSource {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  
+  // Connection settings
+  dbType      String   // 'postgresql', 'mysql', 'mssql', 'oracle'
+  host        String
+  port        Int
+  database    String
+  username    String
+  password    String   // Encrypted in production
+  sslEnabled  Boolean  @default(true)
+  
+  // Status
+  isActive    Boolean  @default(true)
+  lastTestedAt DateTime?
+  connectionStatus String @default("untested") // 'connected', 'failed', 'untested'
+  
+  // Relations
+  syncConfigs SyncConfig[]
+  auditLogs   AuditLog[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Sync Configuration - What tables/columns to sync
+model SyncConfig {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  
+  // Parent data source
+  dataSourceId String
+  dataSource   DataSource @relation(fields: [dataSourceId], references: [id], onDelete: Cascade)
+  
+  // Sync settings
+  isActive    Boolean  @default(true)
+  syncMode    String   @default("full") // 'full', 'incremental'
+  
+  // Schedule
+  scheduleType String  @default("manual") // 'manual', 'hourly', 'daily', 'weekly', 'cron'
+  cronExpression String?
+  
+  // Output settings
+  outputPath  String   @default("./output")
+  outputFileName String @default("sync_data.db")
+  compressOutput Boolean @default(false)
+  encryptOutput Boolean @default(false)
+  
+  // Relations
+  tableConfigs TableConfig[]
+  syncJobs     SyncJob[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Table Configuration - Which tables to sync
+model TableConfig {
+  id          String   @id @default(cuid())
+  
+  // Parent sync config
+  syncConfigId String
+  syncConfig   SyncConfig @relation(fields: [syncConfigId], references: [id], onDelete: Cascade)
+  
+  // Table settings
+  sourceSchema String  @default("public")
+  sourceTable  String
+  targetTable  String? // If different from source
+  
+  // Filtering
+  whereClause  String?
+  rowLimit     Int?
+  
+  // Incremental settings
+  incrementalColumn String?
+  lastSyncValue    String?
+  
+  // Relations
+  columnConfigs ColumnConfig[]
+  
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([syncConfigId, sourceSchema, sourceTable])
+}
+
+// Column Configuration - Which columns to sync
+model ColumnConfig {
+  id          String   @id @default(cuid())
+  
+  // Parent table config
+  tableConfigId String
+  tableConfig   TableConfig @relation(fields: [tableConfigId], references: [id], onDelete: Cascade)
+  
+  // Column settings
+  sourceColumn String
+  targetColumn String? // If different from source
+  dataType     String?
+  
+  // Data masking
+  maskingType  String  @default("none") // 'none', 'redact', 'hash', 'randomize', 'partial'
+  maskingConfig String? // JSON config for masking
+  
+  isIncluded   Boolean @default(true)
+  isPrimaryKey Boolean @default(false)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([tableConfigId, sourceColumn])
+}
+
+// Sync Job - Track sync executions
+model SyncJob {
+  id          String   @id @default(cuid())
+  
+  // Parent sync config
+  syncConfigId String
+  syncConfig   SyncConfig @relation(fields: [syncConfigId], references: [id], onDelete: Cascade)
+  
+  // Job status
+  status      String   @default("pending") // 'pending', 'running', 'completed', 'failed', 'cancelled'
+  
+  // Timing
+  startedAt   DateTime?
+  completedAt DateTime?
+  
+  // Results
+  rowsProcessed Int     @default(0)
+  tablesProcessed Int   @default(0)
+  outputFileSize Int?   // bytes
+  outputFilePath String?
+  
+  // Error handling
+  errorMessage String?
+  errorDetails String?
+  
+  // Metadata
+  triggeredBy  String  @default("manual") // 'manual', 'schedule', 'api'
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Audit Log - Track all system activities
+model AuditLog {
+  id          String   @id @default(cuid())
+  
+  // Event info
+  eventType   String   // 'sync_started', 'sync_completed', 'config_changed', 'download', 'login', etc.
+  eventDetails String? // JSON details
+  
+  // Actor
+  userId      String?
+  userEmail   String?
+  ipAddress   String?
+  
+  // Resource
+  resourceType String? // 'data_source', 'sync_config', 'sync_job', etc.
+  resourceId   String?
+  
+  // Optional relation to data source
+  dataSourceId String?
+  dataSource   DataSource? @relation(fields: [dataSourceId], references: [id], onDelete: SetNull)
+  
+  createdAt   DateTime @default(now())
+}
+
+// User - Admin authentication
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  name        String?
+  password    String   // Hashed
+  role        String   @default("viewer") // 'admin', 'editor', 'viewer'
+  
+  isActive    Boolean  @default(true)
+  lastLoginAt DateTime?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Settings - Global application settings
+model Setting {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  description String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
