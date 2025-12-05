@@ -24,27 +24,72 @@ import {
   XCircle,
   Download,
   User,
-  Clock
+  Clock,
+  Mail,
+  KeyRound,
+  UserPlus,
+  UserMinus,
+  UserCheck,
+  Ban,
+  Shield,
+  LogIn,
+  LogOut,
 } from 'lucide-react';
 import { getAuditLogs } from '@/lib/api';
 import type { AuditLog } from '@/types';
 import { formatDistanceToNow, format } from 'date-fns';
 
 const eventTypeConfig: Record<string, { icon: React.ElementType; color: string; label: string }> = {
+  // Data Source Events
   data_source_created: { icon: Database, color: 'text-emerald-400', label: 'Data Source Created' },
   data_source_updated: { icon: Database, color: 'text-blue-400', label: 'Data Source Updated' },
   data_source_deleted: { icon: Database, color: 'text-red-400', label: 'Data Source Deleted' },
   connection_tested: { icon: Database, color: 'text-amber-400', label: 'Connection Tested' },
+  
+  // Sync Config Events
   sync_config_created: { icon: Settings, color: 'text-emerald-400', label: 'Sync Config Created' },
   sync_config_updated: { icon: Settings, color: 'text-blue-400', label: 'Sync Config Updated' },
   sync_config_deleted: { icon: Settings, color: 'text-red-400', label: 'Sync Config Deleted' },
   table_configs_updated: { icon: Settings, color: 'text-violet-400', label: 'Tables Configured' },
+  
+  // Sync Job Events
   sync_started: { icon: Play, color: 'text-blue-400', label: 'Sync Started' },
   sync_completed: { icon: CheckCircle2, color: 'text-emerald-400', label: 'Sync Completed' },
   sync_failed: { icon: XCircle, color: 'text-red-400', label: 'Sync Failed' },
   sync_cancelled: { icon: XCircle, color: 'text-amber-400', label: 'Sync Cancelled' },
+  
+  // File Events
   download: { icon: Download, color: 'text-violet-400', label: 'File Downloaded' },
-  login: { icon: User, color: 'text-blue-400', label: 'User Login' },
+  
+  // Auth Events (Legacy)
+  login: { icon: LogIn, color: 'text-blue-400', label: 'User Login' },
+  
+  // User Management Events
+  user_created: { icon: UserPlus, color: 'text-emerald-400', label: 'User Created' },
+  user_updated: { icon: User, color: 'text-blue-400', label: 'User Updated' },
+  user_deleted: { icon: UserMinus, color: 'text-red-400', label: 'User Deleted' },
+  user_approved: { icon: UserCheck, color: 'text-emerald-400', label: 'User Approved' },
+  user_suspended: { icon: Ban, color: 'text-red-400', label: 'User Suspended' },
+  
+  // OTP Events
+  otp_requested: { icon: Mail, color: 'text-blue-400', label: 'OTP Requested' },
+  otp_request_failed: { icon: Mail, color: 'text-amber-400', label: 'OTP Request Failed' },
+  otp_verified: { icon: KeyRound, color: 'text-emerald-400', label: 'OTP Verified' },
+  otp_failed: { icon: KeyRound, color: 'text-red-400', label: 'OTP Failed' },
+  otp_email_failed: { icon: Mail, color: 'text-red-400', label: 'OTP Email Failed' },
+  
+  // Session Events
+  login_success: { icon: LogIn, color: 'text-emerald-400', label: 'Login Success' },
+  login_failed: { icon: LogIn, color: 'text-red-400', label: 'Login Failed' },
+  logout: { icon: LogOut, color: 'text-slate-400', label: 'Logged Out' },
+  session_expired: { icon: Clock, color: 'text-amber-400', label: 'Session Expired' },
+  
+  // SMTP Events
+  smtp_configured: { icon: Mail, color: 'text-blue-400', label: 'SMTP Configured' },
+  smtp_tested: { icon: Mail, color: 'text-amber-400', label: 'SMTP Tested' },
+  
+  // Access Events
+  access_denied: { icon: Shield, color: 'text-red-400', label: 'Access Denied' },
 };
 
 function AuditLogItem({ log }: { log: AuditLog }) {

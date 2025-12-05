@@ -12,7 +12,9 @@ export type MaskingType = 'none' | 'redact' | 'hash' | 'randomize' | 'partial';
 
 export type JobStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
 
-export type UserRole = 'admin' | 'editor' | 'viewer';
+export type UserRole = 'admin' | 'supervisor';
+
+export type UserStatus = 'pending' | 'approved' | 'suspended' | 'expired';
 
 export interface DataSource {
   id: string;
@@ -110,6 +112,7 @@ export interface AuditLog {
   resourceType?: string | null;
   resourceId?: string | null;
   dataSourceId?: string | null;
+  dataSource?: DataSource | null;
   createdAt: Date;
 }
 
@@ -118,8 +121,44 @@ export interface User {
   email: string;
   name?: string | null;
   role: string;
+  status: string;
   isActive: boolean;
+  expiresAt?: Date | null;
+  approvedAt?: Date | null;
+  approvedBy?: string | null;
   lastLoginAt?: Date | null;
+  loginCount: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface OtpToken {
+  id: string;
+  code: string;
+  userId: string;
+  expiresAt: Date;
+  used: boolean;
+  usedAt?: Date | null;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+  createdAt: Date;
+}
+
+export interface SmtpSettings {
+  id: string;
+  enabled: boolean;
+  service: string;
+  host?: string | null;
+  port: number;
+  secure: boolean;
+  ignoreTls: boolean;
+  username?: string | null;
+  password?: string | null;
+  fromEmail?: string | null;
+  fromName: string;
+  lastTestedAt?: Date | null;
+  testStatus?: string | null;
+  testError?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }

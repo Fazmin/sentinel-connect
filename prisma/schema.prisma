@@ -183,19 +183,85 @@ model AuditLog {
   createdAt   DateTime @default(now())
 }
 
-// User - Admin authentication
+// User - Admin authentication with OTP
 model User {
   id          String   @id @default(cuid())
   email       String   @unique
   name        String?
-  password    String   // Hashed
-  role        String   @default("viewer") // 'admin', 'editor', 'viewer'
+  role        String   @default("supervisor") // 'admin', 'supervisor'
   
+  // Account status
+  status      String   @default("pending") // 'pending', 'approved', 'suspended', 'expired'
   isActive    Boolean  @default(true)
+  
+  // Account lifecycle
+  expiresAt   DateTime?  // Account expiry date (null = never expires)
+  approvedAt  DateTime?  // When admin approved the account
+  approvedBy  String?    // ID of admin who approved
+  
+  // Activity tracking
   lastLoginAt DateTime?
+  loginCount  Int       @default(0)
+  
+  // Relations
+  otpTokens   OtpToken[]
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+// OTP Token for passwordless authentication
+model OtpToken {
+  id          String   @id @default(cuid())
+  code        String   // 6-digit OTP code (hashed)
+  
+  // Parent user
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Token lifecycle
+  expiresAt   DateTime // 10 minutes from creation
+  used        Boolean  @default(false)
+  usedAt      DateTime?
+  
+  // Request metadata
+  ipAddress   String?
+  userAgent   String?
+  
+  createdAt   DateTime @default(now())
+}
+
+// SMTP Settings for email delivery
+model SmtpSettings {
+  id            String   @id @default(cuid())
+  
+  // Enable/disable
+  enabled       Boolean  @default(false)
+  
+  // Service configuration
+  service       String   @default("custom") // 'custom', 'gmail', 'outlook', etc.
+  host          String?  // e.g., 'smtp365.mcmaster.ca'
+  port          Int      @default(25)
+  
+  // Security
+  secure        Boolean  @default(false) // true for 465, false for other ports
+  ignoreTls     Boolean  @default(false) // Ignore TLS for servers without it
+  
+  // Authentication
+  username      String?  // e.g., 'engai@mcmaster.ca'
+  password      String?  // Encrypted
+  
+  // Sender info
+  fromEmail     String?  // e.g., 'engai@mcmaster.ca'
+  fromName      String   @default("SentinelConnect")
+  
+  // Status
+  lastTestedAt  DateTime?
+  testStatus    String?  // 'success', 'failed'
+  testError     String?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 // Settings - Global application settings

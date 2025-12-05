@@ -2,8 +2,7 @@
 
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Separator } from '@/components/ui/separator';
-import { Button } from '@/components/ui/button';
-import { Bell, Search } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 
@@ -37,13 +36,6 @@ export function Header({ title, description, actions }: HeaderProps) {
           </div>
           
           <ThemeToggle />
-          
-          <Button variant="ghost" size="icon" className="relative">
-            <Bell className="h-4 w-4" />
-            <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[10px] font-medium text-white">
-              3
-            </span>
-          </Button>
           
           {actions}
         </div>

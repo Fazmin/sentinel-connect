@@ -2,16 +2,23 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 
+// Routes that require admin role
+const adminOnlyRoutes = [
+  '/users',
+  '/api/users',
+  '/api/smtp',
+];
+
+// Routes that are public (no authentication required)
+const publicPaths = [
+  '/login',
+  '/api/auth',
+  '/_next',
+  '/favicon.ico',
+];
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-
-  // Public routes that don't require authentication
-  const publicPaths = [
-    '/login',
-    '/api/auth',
-    '/_next',
-    '/favicon.ico',
-  ];
 
   // Check if the path is public
   const isPublicPath = publicPaths.some(path => pathname.startsWith(path));
@@ -31,6 +38,24 @@ export async function middleware(request: NextRequest) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('callbackUrl', pathname);
     return NextResponse.redirect(loginUrl);
+  }
+
+  // Check for admin-only routes
+  const isAdminRoute = adminOnlyRoutes.some(route => pathname.startsWith(route));
+  
+  if (isAdminRoute && token.role !== 'admin') {
+    // For API routes, return 403 Forbidden
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: Admin access required' },
+        { status: 403 }
+      );
+    }
+    
+    // For page routes, redirect to dashboard with error
+    const dashboardUrl = new URL('/', request.url);
+    dashboardUrl.searchParams.set('error', 'access_denied');
+    return NextResponse.redirect(dashboardUrl);
   }
 
   return NextResponse.next();

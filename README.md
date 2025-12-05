@@ -75,11 +75,12 @@ npm run dev
 
 5. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-6. Login with default credentials:
-   - Email: `admin@sentinelconnect.local`
-   - Password: `admin123`
+6. Login with OTP authentication:
+   - Enter email: `admin@sentinelconnect.local`
+   - Check console for OTP code (or configure SMTP in Settings)
+   - Enter the 6-digit OTP code
 
-> **Important**: Change the default admin password immediately in production!
+> **Note**: Without SMTP configured, OTP codes are logged to the console. Configure SMTP in Settings for email delivery.
 
 ## Project Structure
 
@@ -162,6 +163,22 @@ Comprehensive logging of all system activities:
 ### Audit Logs
 - `GET /api/audit-logs` - List audit logs
 
+### Users (Admin only)
+- `GET /api/users` - List all users
+- `POST /api/users` - Create a new user
+- `GET /api/users/:id` - Get user details
+- `PUT /api/users/:id` - Update a user
+- `DELETE /api/users/:id` - Delete a user
+
+### SMTP (Admin only)
+- `GET /api/smtp` - Get SMTP settings
+- `PUT /api/smtp` - Update SMTP settings
+- `POST /api/smtp/test` - Test SMTP connection
+
+### Authentication
+- `POST /api/auth/request-otp` - Request OTP code
+- `POST /api/auth/[...nextauth]` - NextAuth.js handlers
+
 ### Dashboard
 - `GET /api/dashboard/stats` - Get dashboard statistics
 
@@ -211,7 +228,11 @@ npx prisma studio
 
 ## Implemented Features
 
-- [x] User authentication (NextAuth.js with credentials provider)
+- [x] User authentication with 6-digit OTP (passwordless)
+- [x] User management with admin approval workflow
+- [x] Role-based access control (Admin / Supervisor)
+- [x] Account expiry dates and suspension
+- [x] SMTP configuration for email delivery
 - [x] Real database connectors (PostgreSQL, MySQL, SQL Server)
 - [x] SQLite file generation with better-sqlite3
 - [x] Data masking (redact, hash, randomize, partial)
@@ -220,20 +241,30 @@ npx prisma studio
 - [x] File download endpoint
 - [x] Comprehensive audit logging
 
+## User Roles
+
+| Role | Access |
+|------|--------|
+| **Admin** | Full access: Data sources, sync configs, jobs, audit logs, user management, all settings |
+| **Supervisor** | Limited access: Data sources, sync configs, jobs, audit logs, notification settings only |
+
+## Authentication Flow
+
+1. User enters email on login page
+2. System sends 6-digit OTP (valid for 10 minutes)
+3. User enters OTP to authenticate
+4. Session lasts 120 minutes
 
 ### RUN app
 npx next dev --port 5555
 
-
 ## Roadmap
 
 - [ ] Cloud storage integration (Azure Blob, S3, GCS)
-- [ ] Email notifications
 - [ ] Oracle database connector
 - [ ] Incremental sync with change tracking
 - [ ] API key authentication
 - [ ] Rate limiting
-- [ ] Role-based access control
 
 ## License
 

@@ -1,48 +1,108 @@
 import { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import bcrypt from 'bcryptjs';
 import prisma from './db';
+import { verifyOtpCode, isOtpExpired } from './otp';
 
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
-      name: 'credentials',
+      name: 'otp',
       credentials: {
         email: { label: 'Email', type: 'email' },
-        password: { label: 'Password', type: 'password' },
+        otp: { label: 'OTP', type: 'text' },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          throw new Error('Email and password required');
+        if (!credentials?.email || !credentials?.otp) {
+          throw new Error('Email and OTP required');
         }
 
+        // Find the user
         const user = await prisma.user.findUnique({
           where: { email: credentials.email },
         });
 
-        if (!user || !user.isActive) {
-          throw new Error('Invalid credentials');
+        if (!user) {
+          throw new Error('User not found');
         }
 
-        const isValidPassword = await bcrypt.compare(
-          credentials.password,
-          user.password
-        );
-
-        if (!isValidPassword) {
-          throw new Error('Invalid credentials');
+        // Check user status
+        if (user.status === 'pending') {
+          throw new Error('Account pending approval');
         }
 
-        // Update last login
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { lastLoginAt: new Date() },
+        if (user.status === 'suspended') {
+          throw new Error('Account suspended');
+        }
+
+        if (user.status === 'expired' || (user.expiresAt && new Date(user.expiresAt) < new Date())) {
+          // Update status if expired
+          if (user.status !== 'expired') {
+            await prisma.user.update({
+              where: { id: user.id },
+              data: { status: 'expired' },
+            });
+          }
+          throw new Error('Account expired');
+        }
+
+        if (!user.isActive) {
+          throw new Error('Account inactive');
+        }
+
+        // Find valid OTP token
+        const otpToken = await prisma.otpToken.findFirst({
+          where: {
+            userId: user.id,
+            used: false,
+            expiresAt: { gt: new Date() },
+          },
+          orderBy: { createdAt: 'desc' },
         });
 
-        // Log login
+        if (!otpToken) {
+          throw new Error('No valid OTP found. Please request a new code.');
+        }
+
+        // Verify the OTP
+        const isValidOtp = await verifyOtpCode(credentials.otp, otpToken.code);
+
+        if (!isValidOtp) {
+          // Log failed attempt
+          await prisma.auditLog.create({
+            data: {
+              eventType: 'otp_failed',
+              eventDetails: JSON.stringify({ email: user.email, reason: 'Invalid OTP' }),
+              userId: user.id,
+              userEmail: user.email,
+            },
+          });
+          throw new Error('Invalid OTP');
+        }
+
+        // Check if OTP expired (double check)
+        if (isOtpExpired(otpToken.expiresAt)) {
+          throw new Error('OTP has expired. Please request a new code.');
+        }
+
+        // Mark OTP as used
+        await prisma.otpToken.update({
+          where: { id: otpToken.id },
+          data: { used: true, usedAt: new Date() },
+        });
+
+        // Update user login info
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { 
+            lastLoginAt: new Date(),
+            loginCount: { increment: 1 },
+          },
+        });
+
+        // Log successful login
         await prisma.auditLog.create({
           data: {
-            eventType: 'login',
+            eventType: 'login_success',
             eventDetails: JSON.stringify({ email: user.email }),
             userId: user.id,
             userEmail: user.email,
@@ -60,7 +120,7 @@ export const authOptions: NextAuthOptions = {
   ],
   session: {
     strategy: 'jwt',
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+    maxAge: 120 * 60, // 120 minutes (2 hours)
   },
   callbacks: {
     async jwt({ token, user }) {
@@ -86,38 +146,47 @@ export const authOptions: NextAuthOptions = {
 };
 
 /**
- * Hash a password
+ * Check if user can request OTP (user exists, approved, active, not expired)
  */
-export async function hashPassword(password: string): Promise<string> {
-  return bcrypt.hash(password, 12);
-}
-
-/**
- * Create initial admin user if none exists
- */
-export async function ensureAdminUser(): Promise<void> {
-  const adminEmail = process.env.ADMIN_EMAIL || 'admin@sentinelconnect.local';
-  const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
-
-  const existingAdmin = await prisma.user.findFirst({
-    where: { role: 'admin' },
+export async function canUserLogin(email: string): Promise<{ 
+  canLogin: boolean; 
+  error?: string; 
+  user?: { id: string; name: string | null; email: string; status: string } 
+}> {
+  const user = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true, name: true, email: true, status: true, isActive: true, expiresAt: true },
   });
 
-  if (!existingAdmin) {
-    const hashedPassword = await hashPassword(adminPassword);
-    
-    await prisma.user.create({
-      data: {
-        email: adminEmail,
-        name: 'Admin',
-        password: hashedPassword,
-        role: 'admin',
-        isActive: true,
-      },
-    });
-
-    console.log(`Created admin user: ${adminEmail}`);
-    console.log('Default password: admin123 (change immediately!)');
+  if (!user) {
+    return { canLogin: false, error: 'No account found with this email address' };
   }
-}
 
+  if (user.status === 'pending') {
+    return { canLogin: false, error: 'Your account is pending approval. Please wait for an administrator to approve your account.' };
+  }
+
+  if (user.status === 'suspended') {
+    return { canLogin: false, error: 'Your account has been suspended. Please contact an administrator.' };
+  }
+
+  if (!user.isActive) {
+    return { canLogin: false, error: 'Your account is inactive. Please contact an administrator.' };
+  }
+
+  // Check expiry
+  if (user.expiresAt && new Date(user.expiresAt) < new Date()) {
+    // Update status to expired
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { status: 'expired' },
+    });
+    return { canLogin: false, error: 'Your account has expired. Please contact an administrator.' };
+  }
+
+  if (user.status === 'expired') {
+    return { canLogin: false, error: 'Your account has expired. Please contact an administrator.' };
+  }
+
+  return { canLogin: true, user };
+}

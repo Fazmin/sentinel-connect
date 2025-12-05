@@ -13,7 +13,9 @@ import {
   FileOutput,
   ChevronDown,
   LogOut,
-  User
+  User,
+  Users,
+  UserCog,
 } from 'lucide-react';
 
 import {
@@ -37,7 +39,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-const navigationItems = [
+import { Badge } from '@/components/ui/badge';
+
+// Navigation items visible to all authenticated users
+const mainNavigationItems = [
   {
     title: 'Dashboard',
     href: '/',
@@ -65,13 +70,21 @@ const navigationItems = [
   },
 ];
 
-const settingsItems = [
+// Admin-only navigation items
+const adminNavigationItems = [
   {
-    title: 'Settings',
-    href: '/settings',
-    icon: Settings,
+    title: 'User Management',
+    href: '/users',
+    icon: Users,
   },
 ];
+
+// Settings item (visible to all, but with different access levels)
+const settingsItem = {
+  title: 'Settings',
+  href: '/settings',
+  icon: Settings,
+};
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -80,7 +93,8 @@ export function AppSidebar() {
   const userInitial = session?.user?.name?.[0] || session?.user?.email?.[0] || 'U';
   const userName = session?.user?.name || 'User';
   const userEmail = session?.user?.email || '';
-  const userRole = session?.user?.role || 'viewer';
+  const userRole = session?.user?.role || 'supervisor';
+  const isAdmin = userRole === 'admin';
 
   return (
     <Sidebar className="border-r border-sidebar-border">
@@ -107,7 +121,7 @@ export function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navigationItems.map((item) => (
+              {mainNavigationItems.map((item) => (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton
                     asChild
@@ -125,26 +139,56 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
+        {/* Admin-only section */}
+        {isAdmin && (
+          <SidebarGroup className="mt-6">
+            <SidebarGroupLabel className="px-3 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/50">
+              Administration
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {adminNavigationItems.map((item) => (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={pathname === item.href || pathname.startsWith(item.href + '/')}
+                      className="h-10 px-3 transition-colors"
+                    >
+                      <Link href={item.href}>
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
         <SidebarGroup className="mt-6">
           <SidebarGroupLabel className="px-3 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/50">
             System
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {settingsItems.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={pathname === item.href}
-                    className="h-10 px-3 transition-colors"
-                  >
-                    <Link href={item.href}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={pathname === settingsItem.href}
+                  className="h-10 px-3 transition-colors"
+                >
+                  <Link href={settingsItem.href}>
+                    <settingsItem.icon className="h-4 w-4" />
+                    <span>{settingsItem.title}</span>
+                    {!isAdmin && (
+                      <Badge variant="secondary" className="ml-auto text-xs">
+                        Limited
+                      </Badge>
+                    )}
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -172,13 +216,25 @@ export function AppSidebar() {
             <div className="px-2 py-1.5">
               <p className="text-xs text-muted-foreground">Signed in as</p>
               <p className="text-sm font-medium">{userEmail}</p>
-              <p className="text-xs text-muted-foreground capitalize">{userRole}</p>
+              <div className="mt-1 flex items-center gap-2">
+                {isAdmin ? (
+                  <Badge variant="secondary" className="bg-violet-500/10 text-violet-500">
+                    <Shield className="mr-1 h-3 w-3" />
+                    Admin
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary" className="bg-blue-500/10 text-blue-500">
+                    <UserCog className="mr-1 h-3 w-3" />
+                    Supervisor
+                  </Badge>
+                )}
+              </div>
             </div>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
               <Link href="/settings">
                 <User className="mr-2 h-4 w-4" />
-                Profile Settings
+                Settings
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
