@@ -5,6 +5,7 @@ import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { Bell, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 
 interface HeaderProps {
   title: string;
@@ -34,6 +35,8 @@ export function Header({ title, description, actions }: HeaderProps) {
               className="w-64 pl-9"
             />
           </div>
+          
+          <ThemeToggle />
           
           <Button variant="ghost" size="icon" className="relative">
             <Bell className="h-4 w-4" />
